@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Kaca Pembesar Pro</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0d1117">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #000; color: #e6edf3;
+    width: 100vw; height: 100vh; overflow: hidden;
+    display: flex; flex-direction: column;
+}
+
+/* ═══ HEADER ═══ */
+header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px; background: #0d1117; border-bottom: 1px solid #21262d;
+    z-index: 10; flex-shrink: 0;
+}
+header .title { font-size: 14px; font-weight: 700; color: #e6edf3; }
+header .title span { color: #58a6ff; }
+header .header-actions { display: flex; gap: 6px; }
+.header-btn {
+    padding: 7px 12px; background: #21262d; border: 1px solid #30363d;
+    border-radius: 8px; color: #e6edf3; font-size: 12px;
+    font-weight: 600; cursor: pointer;
+}
+.header-btn:active { background: #30363d; }
+.header-btn.active { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+
+/* ═══ VIEWER ═══ */
+#viewer {
+    flex: 1; position: relative; overflow: hidden;
+    background: #000; display: flex; align-items: center; justify-content: center;
+    touch-action: none;
+}
+#cam, #imgView {
+    max-width: 100%; max-height: 100%;
+    transform-origin: center center;
+    will-change: transform;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+}
+#cam { display: none; object-fit: contain; }
+#imgView { display: none; object-fit: contain; }
+#cam.active, #imgView.active { display: block; }
+
+/* Freeze badge */
+#freezeBadge {
+    position: absolute; top: 12px; left: 12px;
+    background: rgba(218, 54, 51, 0.9); color: #fff;
+    padding: 4px 10px; border-radius: 6px;
+    font-size: 11px; font-weight: 700;
+    display: none; z-index: 5;
+    border: 1px solid rgba(255,255,255,0.2);
+}
+#freezeBadge.show { display: block; }
+
+/* Zoom info */
+#zoomBadge {
+    position: absolute; top: 12px; right: 12px;
+    background: rgba(0, 0, 0, 0.65); color: #58a6ff;
+    padding: 4px 10px; border-radius: 6px;
+    font-size: 12px; font-weight: 700; font-family: monospace;
+    z-index: 5; border: 1px solid rgba(88, 166, 255, 0.3);
+    pointer-events: none;
+}
+
+/* No camera msg */
+#cameraMsg {
+    position: absolute; inset: 0;
+    display: none; flex-direction: column; align-items: center; justify-content: center;
+    padding: 20px; text-align: center; color: #7d8590;
+    z-index: 3;
+}
+#cameraMsg.show { display: flex; }
+#cameraMsg .icon { font-size: 48px; margin-bottom: 12px; }
+#cameraMsg .msg { font-size: 13px; line-height: 1.6; max-width: 320px; }
+#cameraMsg button {
+    margin-top: 16px; padding: 10px 20px;
+    background: #1f6feb; color: #fff; border: none;
+    border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+
+/* ═══ CONTROLS PANEL ═══ */
+#controls {
+    background: #0d1117; border-top: 1px solid #21262d;
+    padding: 10px 14px 8px; flex-shrink: 0;
+    max-height: 40vh; overflow-y: auto;
+}
+
+.slider-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 0;
+}
+.slider-row .icon {
+    width: 24px; text-align: center; font-size: 14px;
+    color: #7d8590; flex-shrink: 0;
+}
+.slider-row .label {
+    width: 70px; font-size: 11px; color: #7d8590;
+    font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.3px; flex-shrink: 0;
+}
+.slider-row input[type="range"] {
+    flex: 1; height: 4px; -webkit-appearance: none;
+    background: #21262d; border-radius: 3px; outline: none;
+}
+.slider-row input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 18px; height: 18px; background: #58a6ff;
+    border-radius: 50%; cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+}
+.slider-row input[type="range"]::-moz-range-thumb {
+    width: 18px; height: 18px; background: #58a6ff;
+    border-radius: 50%; border: none; cursor: pointer;
+}
+.slider-row .value {
+    width: 46px; text-align: right; font-size: 11px;
+    color: #e6edf3; font-weight: 700; font-family: monospace;
+    flex-shrink: 0;
+}
+
+/* ═══ ACTION BAR ═══ */
+.actions {
+    display: grid; grid-template-columns: repeat(6, 1fr);
+    gap: 6px; padding: 10px 0 4px;
+    margin-top: 4px;
+}
+.action-btn {
+    background: #21262d; border: 1px solid #30363d;
+    border-radius: 10px; padding: 10px 4px;
+    color: #e6edf3; font-size: 18px;
+    cursor: pointer; display: flex;
+    flex-direction: column; align-items: center; gap: 3px;
+    transition: all 0.15s;
+}
+.action-btn:active { background: #30363d; }
+.action-btn.active { background: #1f6feb; border-color: #1f6feb; }
+.action-btn .label {
+    font-size: 8px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.3px;
+    color: #7d8590;
+}
+.action-btn.active .label { color: #fff; }
+
+/* ═══ MODE STRIP ═══ */
+.mode-strip {
+    display: flex; gap: 6px; overflow-x: auto;
+    padding: 6px 0; scrollbar-width: none;
+}
+.mode-strip::-webkit-scrollbar { display: none; }
+.mode-chip {
+    flex-shrink: 0; padding: 7px 12px;
+    background: #21262d; border: 1px solid #30363d;
+    border-radius: 16px; font-size: 11px;
+    color: #e6edf3; font-weight: 600;
+    cursor: pointer; white-space: nowrap;
+}
+.mode-chip.active {
+    background: #1f6feb; border-color: #1f6feb; color: #fff;
+}
+
+/* ═══ TOAST ═══ */
+#toast {
+    position: fixed; bottom: 20px; left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: #21262d; color: #e6edf3;
+    padding: 12px 20px; border-radius: 10px;
+    font-size: 13px; font-weight: 600;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    border: 1px solid #30363d;
+    transition: transform 0.3s ease;
+    z-index: 9999; max-width: 90vw;
+}
+#toast.show { transform: translateX(-50%) translateY(0); }
+#toast.success { border-color: #238636; }
+#toast.error { border-color: #da3633; }
+
+/* ═══ HIDDEN INPUT ═══ */
+#fileInput { display: none; }
+
+/* ═══ FLOATING HINT ═══ */
+#gestureHint {
+    position: fixed; bottom: 50%; left: 50%;
+    transform: translate(-50%, 50%);
+    background: rgba(0,0,0,0.85); color: #e6edf3;
+    padding: 12px 20px; border-radius: 12px;
+    font-size: 12px; line-height: 1.6; text-align: center;
+    z-index: 9998; pointer-events: none;
+    opacity: 0; transition: opacity 0.3s;
+    max-width: 80vw;
+}
+#gestureHint.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<header>
+    <div class="title">🔍 Kaca <span>Pembesar</span></div>
+    <div class="header-actions">
+        <button class="header-btn active" id="btnCamMode" onclick="switchSource('camera')">📷 Kamera</button>
+        <button class="header-btn" id="btnImgMode" onclick="switchSource('image')">🖼️ Foto</button>
+    </div>
+</header>
+
+<div id="viewer">
+    <video id="cam" autoplay playsinline muted></video>
+    <img id="imgView" alt="Preview">
+    <div id="freezeBadge">❄️ FREEZE</div>
+    <div id="zoomBadge">1.0×</div>
+    <div id="cameraMsg">
+        <div class="icon">📷</div>
+        <div class="msg" id="cameraMsgText">Meminta izin kamera...</div>
+        <button onclick="startCamera()" id="btnRetryCam" style="display:none;">Coba Lagi</button>
+    </div>
+</div>
+
+<div id="controls">
+
+    <!-- Zoom slider -->
+    <div class="slider-row">
+        <div class="icon">🔍</div>
+        <div class="label">Zoom</div>
+        <input type="range" id="zoomSlider" min="1" max="20" step="0.1" value="1">
+        <div class="value" id="zoomVal">1.0×</div>
+    </div>
+
+    <!-- Brightness -->
+    <div class="slider-row">
+        <div class="icon">☀️</div>
+        <div class="label">Cerah</div>
+        <input type="range" id="brightSlider" min="50" max="250" step="5" value="100">
+        <div class="value" id="brightVal">100%</div>
+    </div>
+
+    <!-- Contrast -->
+    <div class="slider-row">
+        <div class="icon">◐</div>
+        <div class="label">Kontras</div>
+        <input type="range" id="contrastSlider" min="50" max="250" step="5" value="100">
+        <div class="value" id="contrastVal">100%</div>
+    </div>
+
+    <!-- Color modes -->
+    <div class="mode-strip">
+        <div class="mode-chip active" data-mode="normal" onclick="setColorMode('normal')">Normal</div>
+        <div class="mode-chip" data-mode="invert" onclick="setColorMode('invert')">🔄 Invert</div>
+        <div class="mode-chip" data-mode="hcontrast" onclick="setColorMode('hcontrast')">⚡ Kontras</div>
+        <div class="mode-chip" data-mode="bw" onclick="setColorMode('bw')">⚫ B&W</div>
+        <div class="mode-chip" data-mode="sepia" onclick="setColorMode('sepia')">📜 Sepia</div>
+        <div class="mode-chip" data-mode="warm" onclick="setColorMode('warm')">🌅 Hangat</div>
+    </div>
+
+    <!-- Actions -->
+    <div class="actions">
+        <button class="action-btn" id="btnFreeze" onclick="toggleFreeze()">
+            <span>❄️</span><span class="label">Freeze</span>
+        </button>
+        <button class="action-btn" id="btnFlash" onclick="toggleFlash()">
+            <span>🔦</span><span class="label">Flash</span>
+        </button>
+        <button class="action-btn" onclick="takeSnapshot()">
+            <span>📸</span><span class="label">Tangkap</span>
+        </button>
+        <button class="action-btn" onclick="document.getElementById('fileInput').click()">
+            <span>🖼️</span><span class="label">Buka</span>
+        </button>
+        <button class="action-btn" id="btnSwitchCam" onclick="switchCamera()">
+            <span>🔄</span><span class="label">Kamera</span>
+        </button>
+        <button class="action-btn" onclick="resetAll()">
+            <span>↺</span><span class="label">Reset</span>
+        </button>
+    </div>
+</div>
+
+<input type="file" id="fileInput" accept="image/*">
+<div id="toast"></div>
+<div id="gestureHint"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════
+let stream = null;
+let currentSource = 'camera';   // 'camera' | 'image'
+let facingMode = 'environment'; // back camera default
+let isFrozen = false;
+let flashOn = false;
+let torchSupported = false;
+
+let zoom = 1, panX = 0, panY = 0;
+let brightness = 100;
+let contrast = 100;
+let colorMode = 'normal';
+
+// Touch
+let initialDist = 0, initialZoom = 1;
+let isDragging = false, startX = 0, startY = 0;
+let lastTapTime = 0;
+
+// ═══════════════════════════════════════════════════════
+// ELEMENTS
+// ═══════════════════════════════════════════════════════
+const camEl = document.getElementById('cam');
+const imgEl = document.getElementById('imgView');
+const viewerEl = document.getElementById('viewer');
+const zoomBadge = document.getElementById('zoomBadge');
+const freezeBadge = document.getElementById('freezeBadge');
+const cameraMsg = document.getElementById('cameraMsg');
+const cameraMsgText = document.getElementById('cameraMsgText');
+const btnRetryCam = document.getElementById('btnRetryCam');
+
+// ═══════════════════════════════════════════════════════
+// UTIL
+// ═══════════════════════════════════════════════════════
+function showToast(msg, type = 'info') {
+    const t = document.getElementById('toast');
+    t.innerText = msg;
+    t.className = type + ' show';
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => { t.className = type; }, 2200);
+}
+
+function showHint(msg, duration = 3000) {
+    const h = document.getElementById('gestureHint');
+    h.innerHTML = msg;
+    h.classList.add('show');
+    clearTimeout(h._timer);
+    h._timer = setTimeout(() => h.classList.remove('show'), duration);
+}
+
+// ═══════════════════════════════════════════════════════
+// CAMERA
+// ═══════════════════════════════════════════════════════
+async function startCamera() {
+    cameraMsg.classList.add('show');
+    cameraMsgText.innerText = 'Meminta izin kamera...';
+    btnRetryCam.style.display = 'none';
+
+    // Stop kamera lama
+    if (stream) {
+        stream.getTracks().forEach(t => t.stop());
+        stream = null;
+    }
+
+    try {
+        stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+                facingMode: { ideal: facingMode },
+                width: { ideal: 1920 },
+                height: { ideal: 1080 }
+            },
+            audio: false
+        });
+
+        camEl.srcObject = stream;
+        await camEl.play();
+
+        // Cek torch
+        const track = stream.getVideoTracks()[0];
+        const caps = track.getCapabilities ? track.getCapabilities() : {};
+        torchSupported = !!caps.torch;
+        document.getElementById('btnFlash').style.opacity = torchSupported ? '1' : '0.4';
+
+        cameraMsg.classList.remove('show');
+        console.log('✅ Kamera aktif');
+    } catch (e) {
+        console.error('Camera error:', e);
+        cameraMsgText.innerText = 
+            'Tidak bisa akses kamera.\n\n' +
+            '• Pastikan izin kamera diberikan\n' +
+            '• Aplikasi harus lewat HTTPS\n' +
+            '• Coba refresh halaman';
+        btnRetryCam.style.display = 'inline-block';
+        showToast('❌ Kamera gagal: ' + (e.message || e.name), 'error');
+    }
+}
+
+function stopCamera() {
+    if (stream) {
+        stream.getTracks().forEach(t => t.stop());
+        stream = null;
+    }
+}
+
+function switchSource(source) {
+    currentSource = source;
+    document.getElementById('btnCamMode').classList.toggle('active', source === 'camera');
+    document.getElementById('btnImgMode').classList.toggle('active', source === 'image');
+
+    if (source === 'camera') {
+        camEl.classList.add('active');
+        imgEl.classList.remove('active');
+        if (!stream) startCamera();
+    } else {
+        camEl.classList.remove('active');
+        imgEl.classList.add('active');
+        document.getElementById('fileInput').click();
+    }
+    resetView();
+}
+
+function switchCamera() {
+    if (currentSource !== 'camera') return;
+    facingMode = facingMode === 'environment' ? 'user' : 'environment';
+    console.log(`🔄 Switch camera: ${facingMode}`);
+    startCamera();
+    showToast(facingMode === 'environment' ? '📷 Kamera belakang' : '🤳 Kamera depan');
+}
+
+async function toggleFlash() {
+    if (!torchSupported || !stream) {
+        showToast('🔦 HP ini tidak support flash dari browser');
+        return;
+    }
+    flashOn = !flashOn;
+    try {
+        const track = stream.getVideoTracks()[0];
+        await track.applyConstraints({ advanced: [{ torch: flashOn }] });
+        document.getElementById('btnFlash').classList.toggle('active', flashOn);
+        showToast(flashOn ? '🔦 Flash ON' : '🔦 Flash OFF');
+    } catch (e) {
+        console.warn('Flash error:', e.message);
+        flashOn = false;
+        document.getElementById('btnFlash').classList.remove('active');
+        showToast('Gagal toggle flash', 'error');
+    }
+}
+
+function toggleFreeze() {
+    if (currentSource !== 'camera') {
+        showToast('Freeze hanya di mode kamera');
+        return;
+    }
+    isFrozen = !isFrozen;
+    if (isFrozen) {
+        camEl.pause();
+        freezeBadge.classList.add('show');
+        document.getElementById('btnFreeze').classList.add('active');
+        showToast('❄️ Freeze');
+    } else {
+        camEl.play().catch(() => {});
+        freezeBadge.classList.remove('show');
+        document.getElementById('btnFreeze').classList.remove('active');
+        showToast('▶️ Live');
+    }
+}
+
+// ═══════════════════════════════════════════════════════
+// IMAGE FILE
+// ═══════════════════════════════════════════════════════
+document.getElementById('fileInput').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Stop kamera kalau ada
+    stopCamera();
+    camEl.srcObject = null;
+
+    const url = URL.createObjectURL(file);
+    imgEl.src = url;
+    imgEl.onload = () => {
+        console.log(`🖼️ Gambar dimuat: ${imgEl.naturalWidth}×${imgEl.naturalHeight}`);
+        showToast('🖼️ Gambar dimuat');
+        resetView();
+    };
+    imgEl.onerror = () => {
+        showToast('❌ Gagal buka gambar', 'error');
+    };
+
+    document.getElementById('btnCamMode').classList.remove('active');
+    document.getElementById('btnImgMode').classList.add('active');
+    currentSource = 'image';
+    camEl.classList.remove('active');
+    imgEl.classList.add('active');
+});
+
+// ═══════════════════════════════════════════════════════
+// TRANSFORM — zoom, pan, filter
+// ═══════════════════════════════════════════════════════
+function getActiveEl() {
+    return currentSource === 'camera' ? camEl : imgEl;
+}
+
+function getColorFilter() {
+    let base = `brightness(${brightness / 100}) contrast(${contrast / 100})`;
+    switch (colorMode) {
+        case 'invert':    return base + ' invert(1) hue-rotate(180deg)';
+        case 'hcontrast': return base + ' contrast(2) saturate(0.5)';
+        case 'bw':        return base + ' grayscale(1)';
+        case 'sepia':     return base + ' sepia(0.8) saturate(1.2)';
+        case 'warm':      return base + ' sepia(0.3) saturate(1.4) hue-rotate(-15deg)';
+        default:          return base;
+    }
+}
+
+function applyTransform() {
+    const el = getActiveEl();
+    if (!el) return;
+    el.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
+    el.style.filter = getColorFilter();
+    zoomBadge.innerText = zoom.toFixed(1) + '×';
+}
+
+function resetView() {
+    zoom = 1; panX = 0; panY = 0;
+    document.getElementById('zoomSlider').value = 1;
+    document.getElementById('zoomVal').innerText = '1.0×';
+    applyTransform();
+}
+
+function resetAll() {
+    resetView();
+    brightness = 100;
+    contrast = 100;
+    colorMode = 'normal';
+    document.getElementById('brightSlider').value = 100;
+    document.getElementById('contrastSlider').value = 100;
+    document.getElementById('brightVal').innerText = '100%';
+    document.getElementById('contrastVal').innerText = '100%';
+    document.querySelectorAll('.mode-chip').forEach(c => c.classList.remove('active'));
+    document.querySelector('.mode-chip[data-mode="normal"]').classList.add('active');
+    applyTransform();
+    showToast('↺ Reset');
+}
+
+// ═══════════════════════════════════════════════════════
+// SLIDERS
+// ═══════════════════════════════════════════════════════
+document.getElementById('zoomSlider').addEventListener('input', (e) => {
+    zoom = parseFloat(e.target.value);
+    document.getElementById('zoomVal').innerText = zoom.toFixed(1) + '×';
+    clampPan();
+    applyTransform();
+});
+
+document.getElementById('brightSlider').addEventListener('input', (e) => {
+    brightness = parseInt(e.target.value);
+    document.getElementById('brightVal').innerText = brightness + '%';
+    applyTransform();
+});
+
+document.getElementById('contrastSlider').addEventListener('input', (e) => {
+    contrast = parseInt(e.target.value);
+    document.getElementById('contrastVal').innerText = contrast + '%';
+    applyTransform();
+});
+
+function setColorMode(mode) {
+    colorMode = mode;
+    document.querySelectorAll('.mode-chip').forEach(c => {
+        c.classList.toggle('active', c.dataset.mode === mode);
+    });
+    applyTransform();
+}
+
+// ═══════════════════════════════════════════════════════
+// CLAMP PAN — batasi geser agar tidak keluar frame
+// ═══════════════════════════════════════════════════════
+function clampPan() {
+    const el = getActiveEl();
+    if (!el || zoom <= 1) { panX = 0; panY = 0; return; }
+    const rect = viewerEl.getBoundingClientRect();
+    const maxPanX = (rect.width * (zoom - 1)) / 2;
+    const maxPanY = (rect.height * (zoom - 1)) / 2;
+    panX = Math.max(-maxPanX, Math.min(panX, maxPanX));
+    panY = Math.max(-maxPanY, Math.min(panY, maxPanY));
+}
+
+// ═══════════════════════════════════════════════════════
+// TOUCH — pinch + pan + double-tap
+// ═══════════════════════════════════════════════════════
+function getDist(t) {
+    return Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+}
+
+viewerEl.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 2) {
+        initialDist = getDist(e.touches);
+        initialZoom = zoom;
+        isDragging = false;
+        return;
+    }
+    if (e.touches.length === 1) {
+        const t = e.touches[0];
+        const now = Date.now();
+
+        // Double tap
+        if (now - lastTapTime < 300 && now - lastTapTime > 0) {
+            if (zoom > 1.5) resetView();
+            else {
+                zoom = 3;
+                document.getElementById('zoomSlider').value = 3;
+                document.getElementById('zoomVal').innerText = '3.0×';
+                applyTransform();
+                showToast('🔍 Zoom 3×');
+            }
+            lastTapTime = 0;
+            return;
+        }
+        lastTapTime = now;
+
+        isDragging = true;
+        startX = t.clientX - panX;
+        startY = t.clientY - panY;
+    }
+}, { passive: true });
+
+viewerEl.addEventListener('touchmove', (e) => {
+    if (e.cancelable) e.preventDefault();
+
+    if (e.touches.length === 2) {
+        const dist = getDist(e.touches);
+        const ratio = dist / initialDist;
+        let newZoom = Math.max(1, Math.min(initialZoom * ratio, 20));
+        zoom = newZoom;
+        document.getElementById('zoomSlider').value = zoom;
+        document.getElementById('zoomVal').innerText = zoom.toFixed(1) + '×';
+        clampPan();
+        applyTransform();
+        return;
+    }
+
+    if (e.touches.length === 1 && isDragging && zoom > 1) {
+        panX = e.touches[0].clientX - startX;
+        panY = e.touches[0].clientY - startY;
+        clampPan();
+        applyTransform();
+    }
+}, { passive: false });
+
+viewerEl.addEventListener('touchend', () => {
+    isDragging = false;
+});
+
+// Desktop mouse drag support
+viewerEl.addEventListener('mousedown', (e) => {
+    if (zoom <= 1) return;
+    isDragging = true;
+    startX = e.clientX - panX;
+    startY = e.clientY - panY;
+});
+viewerEl.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+    panX = e.clientX - startX;
+    panY = e.clientY - startY;
+    clampPan();
+    applyTransform();
+});
+viewerEl.addEventListener('mouseup', () => { isDragging = false; });
+viewerEl.addEventListener('mouseleave', () => { isDragging = false; });
+
+// ═══════════════════════════════════════════════════════
+// SNAPSHOT
+// ═══════════════════════════════════════════════════════
+async function takeSnapshot() {
+    const el = getActiveEl();
+    if (!el) return;
+
+    try {
+        const w = currentSource === 'camera' ? camEl.videoWidth : imgEl.naturalWidth;
+        const h = currentSource === 'camera' ? camEl.videoHeight : imgEl.naturalHeight;
+        if (!w || !h) {
+            showToast('❌ Tidak ada yang bisa ditangkap', 'error');
+            return;
+        }
+
+        // Buat canvas dengan ukuran area yang terlihat (viewport viewer)
+        const viewerRect = viewerEl.getBoundingClientRect();
+        const viewW = Math.floor(viewerRect.width);
+        const viewH = Math.floor(viewerRect.height);
+
+        const canvas = document.createElement('canvas');
+        canvas.width = viewW;
+        canvas.height = viewH;
+        const ctx = canvas.getContext('2d');
+
+        // Hitung area source yang masuk viewport
+        const scaleFit = Math.min(viewW / w, viewH / h);
+        const totalZoom = scaleFit * zoom;
+        const offsetX = (w / 2) - (viewW / 2) / totalZoom - panX / totalZoom;
+        const offsetY = (h / 2) - (viewH / 2) / totalZoom - panY / totalZoom;
+        const srcW = viewW / totalZoom;
+        const srcH = viewH / totalZoom;
+
+        // Apply filter ke canvas
+        ctx.filter = getColorFilter();
+
+        if (currentSource === 'camera') {
+            ctx.drawImage(camEl, offsetX, offsetY, srcW, srcH, 0, 0, viewW, viewH);
+        } else {
+            ctx.drawImage(imgEl, offsetX, offsetY, srcW, srcH, 0, 0, viewW, viewH);
+        }
+
+        canvas.toBlob((blob) => {
+            if (!blob) {
+                showToast('❌ Gagal konversi', 'error');
+                return;
+            }
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `magnifier_${Date.now()}.jpg`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 5000);
+            showToast('📸 Snapshot disimpan', 'success');
+        }, 'image/jpeg', 0.92);
+
+    } catch (e) {
+        console.error('Snapshot error:', e);
+        showToast('❌ ' + e.message, 'error');
+    }
+}
+
+// ═══════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════
+window.addEventListener('load', () => {
+    // Hint gesture
+    setTimeout(() => {
+        showHint('💡 Pinch untuk zoom · Drag untuk geser · Double-tap 3× zoom', 4000);
+    }, 800);
+
+    // Start kamera default
+    camEl.classList.add('active');
+    startCamera();
+});
+
+// Cleanup
+window.addEventListener('beforeunload', () => {
+    stopCamera();
+});
+
+// ═══════════════════════════════════════════════════════
+// SERVICE WORKER
+// ═══════════════════════════════════════════════════════
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js')
+        .then(() => console.log('SW aktif'))
+        .catch((e) => console.warn('SW gagal:', e.message));
+}
+</script>
+
+</body>
+</html>
